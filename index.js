@@ -33,25 +33,37 @@ app.get('/subscribers', async (req, res) => {
 });
 
 // Route to send email
+// Route to send email
 app.post('/send-email', async (req, res) => {
-    const { bcc, subject, body } = req.body;
+    const { recipients, subject, body } = req.body; // Updated to accept an array of recipients
 
     try {
-        const mailOptions = {
-            from: process.env.EMAIL_USER, // sender address
-            to: '', // Keep empty since it's a BCC
-            bcc, // BCC the selected recipients
-            subject,
-            html: body // Use HTML formatting for the email body
-        };
+        // Ensure recipients is an array
+        if (!Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({ message: 'Recipients must be provided' });
+        }
 
-        await transporter.sendMail(mailOptions);
-        res.status(200).json({ message: 'Email sent successfully!' });
+        // Send email to each recipient
+        const emailPromises = recipients.map(async ({ name, email }) => {
+            const mailOptions = {
+                from: process.env.EMAIL_USER, // sender address
+                to: email, // individual recipient email
+                subject,
+                html: `<p>Dear ${name},</p>${body}` // Personalized greeting
+            };
+
+            return transporter.sendMail(mailOptions);
+        });
+
+        await Promise.all(emailPromises); // Wait for all emails to be sent
+
+        res.status(200).json({ message: 'Emails sent successfully!' });
     } catch (error) {
         console.error('Error sending email:', error);
         res.status(500).json({ message: 'Error sending email', error });
     }
 });
+
 
 app.post('/subscribe', async (req, res) => {
     const { name, email } = req.body;
